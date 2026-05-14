@@ -1,0 +1,21 @@
+# Document Fraud Detection Pipeline
+# Weights sum to 1.0. Missing signals are auto-renormalised by EnsembleScorer.
+
+pipeline: document_fraud
+
+weights:
+  trufor:                     0.30   # TruFor global integrity score
+  srm:                        0.20   # SRM copy-paste / splicing residual
+  siglip2:                    0.20   # SigLIP-2 So400m zero-shot
+  noiseprint_localizer:       0.15   # NoisePrint++ tamper region
+  mask_spatial_concentration: 0.05   # TruFor spatial hotspot concentration
+  ela:                        0.05   # JPEG error level analysis
+  prnu:                       0.05   # FFT frequency band ratio
+
+thresholds:
+  authentic:   0.35   # ensemble_score < 0.35 → Authentic
+  suspicious:  0.60   # 0.35–0.60 → Suspicious; ≥0.60 → Likely Fraudulent
+
+inference:
+  fake_threshold: 0.10   # DualBranch full-image fake_prob threshold
+  use_welford:    false  # Welford z-score normalisation (enable for batches)

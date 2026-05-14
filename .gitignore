@@ -1,0 +1,42 @@
+# ── Control Room (local only — never push to GitHub) ──────────────────────────
+CLAUDE.md
+.claude/
+control_room/
+control_room_v2/
+
+# ── Model weights (large binary files) ────────────────────────────────────────
+weights/
+*.pth
+*.pth.tar
+*.pt
+*.onnx
+*.bin
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# ── Environment & secrets ──────────────────────────────────────────────────────
+.env
+.env.*
+*.key
+
+# ── Sample / test images ───────────────────────────────────────────────────────
+samples/
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,19 @@
+# Vehicle Damage Detection Pipeline
+# Weights sum to 1.0. Missing signals are auto-renormalised by EnsembleScorer.
+
+pipeline: vehicle_damage
+
+weights:
+  dual_branch: 0.30   # DualBranch RGB+DCT EfficientNet
+  clip_ufd:    0.25   # CLIP ViT-L/14 UniversalFakeDetect
+  trufor:      0.30   # TruFor pixel-level forgery localization
+  srm:         0.10   # SRM copy-paste / splicing residual
+  metadata:    0.05   # EXIF metadata authenticity (inverted)
+
+thresholds:
+  authentic:   0.35
+  suspicious:  0.60
+
+inference:
+  fake_threshold: 0.10
+  use_welford:    false

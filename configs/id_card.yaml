@@ -1,0 +1,22 @@
+# ID Card Edit Detection Pipeline
+# Replaces SigLIP-2 with DualBranch as the primary deep-learning signal.
+# Weights sum to 1.0. Missing signals are auto-renormalised by EnsembleScorer.
+
+pipeline: id_card
+
+weights:
+  trufor:      0.30   # TruFor pixel-level forgery localization
+  srm:         0.20   # SRM copy-paste / splicing residual
+  dual_branch: 0.20   # DualBranch RGB+DCT EfficientNet
+  ela:         0.10   # JPEG error level analysis
+  prnu:        0.10   # FFT frequency band ratio
+  dct_benford: 0.05   # DCT coefficient Benford's Law
+  cfa:         0.05   # CFA demosaicing correlation
+
+thresholds:
+  authentic:   0.35
+  suspicious:  0.60
+
+inference:
+  fake_threshold: 0.10
+  use_welford:    false
