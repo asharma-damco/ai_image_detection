@@ -1,0 +1,22 @@
+# Damco Project Identity
+# Fill this in when initialising a new engagement.
+# Used by /sync to resolve external system targets.
+
+project:
+  name: "AI Image Detection"
+  client: "Damco Solutions (Internal)"
+  engagement_type: "development"
+  sow_reference: "INTERNAL-POC-2026"
+  start_date: "2026-05-14"
+  end_date: "TBD"
+  value: "Internal"
+
+damco:
+  delivery_lead: "Abhishek Sharma"
+  email: "abhisheks12@damcogroup.com"
+
+integrations:
+  linear_project_id: ""        # fill when Linear MCP connected
+  nb_erp_project_id: ""        # fill when N&B ERP MCP connected
+  m365_team_id: ""             # fill when M365 MCP connected
+  github_repo: ""              # fill when remote is set
