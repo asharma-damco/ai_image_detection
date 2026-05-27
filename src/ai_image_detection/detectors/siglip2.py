@@ -196,7 +196,7 @@ class SigLIP2Detector:
             if str(UFD_REPO) not in sys.path:
                 sys.path.insert(0, str(UFD_REPO))
 
-            from universal_fake_detect_adapter import UFDAdapter, is_available  # type: ignore
+            from .clip_ufd import UFDAdapter, is_available  # relative import — same detectors package
             if not is_available():
                 return 0.5
 

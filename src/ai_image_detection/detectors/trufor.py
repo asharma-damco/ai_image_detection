@@ -177,7 +177,8 @@ class _FallbackAnalyzer:
                 "portrait_zone_activation":    stats["portrait_zone_activation"],
             }
         except Exception as e:
-            H, W  = pil_image.size[1], pil_image.size[0]
+            # PIL.Image.size is (width, height); numpy arrays are (rows=H, cols=W)
+            W, H  = pil_image.size
             empty = np.zeros((H, W), dtype=np.float32)
             return {
                 "integrity_score":             0.5,

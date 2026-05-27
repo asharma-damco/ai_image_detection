@@ -86,7 +86,12 @@ def _check_focal_length(exif: dict) -> tuple[float, str]:
     if fl is None:
         return (0.0, "FocalLength absent")
     try:
-        fl_mm = float(fl)
+        # EXIF stores rationals as (numerator, denominator) tuples — e.g. (35, 1)
+        # PIL's IFDRational also behaves like a fraction; float() works on it directly.
+        if isinstance(fl, tuple) and len(fl) == 2:
+            fl_mm = float(fl[0]) / float(fl[1]) if float(fl[1]) != 0 else 0.0
+        else:
+            fl_mm = float(fl)
     except (TypeError, ValueError):
         return (0.3, f"FocalLength unparseable: {fl!r}")
     return (1.0, f"FocalLength={fl_mm:.1f}mm") if 4.0 <= fl_mm <= 2000.0 else (0.2, f"FocalLength={fl_mm:.1f}mm (implausible)")

@@ -8,8 +8,11 @@ Launch:
 from __future__ import annotations
 
 import io
+import logging
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 import streamlit as st
 from PIL import Image, ImageDraw
@@ -362,7 +365,9 @@ with st.spinner("Running forensic analysis… (first run loads ML models, may ta
             preset_weights=_PIPELINE_WEIGHTS.get(pipeline),
         )
     except Exception as exc:
-        st.error(f"Pipeline error: {exc}")
+        # M-8: log full traceback to console/server logs; show clean message in UI
+        logger.exception("Pipeline failed with unhandled exception")
+        st.error(f"Pipeline error — {type(exc).__name__}: {exc}")
         st.stop()
 
 # ── Results ───────────────────────────────────────────────────────────────────

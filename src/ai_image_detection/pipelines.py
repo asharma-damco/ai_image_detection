@@ -166,9 +166,12 @@ def run_document_fraud_pipeline(img: Image.Image) -> dict:
 
     try:
         from .detectors.srm import SRMAnalyzer
-        srm_r = _cached("srm", SRMAnalyzer).compute_anomaly_score(img)
-        signals["srm"] = srm_r["score"]
-        details["srm"] = srm_r
+        srm    = _cached("srm", SRMAnalyzer)
+        srm_r  = srm.compute_anomaly_score(img)
+        jpeg_r = srm.detect_jpeg_grid_inconsistency(img)
+        combined = round(0.70 * srm_r["score"] + 0.30 * jpeg_r["score"], 4)
+        signals["srm"] = combined
+        details["srm"] = {"score": combined, "srm": srm_r, "jpeg": jpeg_r}
     except (ImportError, RuntimeError, OSError, ValueError) as e:
         skipped.append(f"srm ({type(e).__name__}: {e})")
 
@@ -177,12 +180,15 @@ def run_document_fraud_pipeline(img: Image.Image) -> dict:
         r = prnu_anomaly_score(img_arr)
         if r["score"] is not None:
             signals["prnu"] = round(float(r["score"]), 4)
+            details["prnu"] = r          # H-1: was missing — full breakdown now stored
     except (ImportError, RuntimeError, OSError, ValueError) as e:
         skipped.append(f"prnu ({type(e).__name__}: {e})")
 
     try:
         from .signals.ela import ela_anomaly_score
-        signals["ela"] = round(float(ela_anomaly_score(img)["score"]), 4)
+        ela_r = ela_anomaly_score(img)
+        signals["ela"] = round(float(ela_r["score"]), 4)
+        details["ela"] = ela_r
     except (ImportError, RuntimeError, OSError, ValueError) as e:
         skipped.append(f"ela ({type(e).__name__}: {e})")
 
@@ -195,6 +201,7 @@ def run_document_fraud_pipeline(img: Image.Image) -> dict:
         "score":      ensemble["ensemble_score"],
         "confidence": ensemble["confidence"],
         "signals":    signals,
+        "details":    details,   # H-1: expose heatmaps / per-signal breakdowns to UI
         "ensemble":   ensemble,
         "skipped":    skipped,
     }
@@ -267,7 +274,10 @@ def run_vehicle_damage_pipeline(
 
     try:
         from .detectors.srm import SRMAnalyzer
-        signals["srm"] = _cached("srm", SRMAnalyzer).compute_anomaly_score(img)["score"]
+        _srm   = _cached("srm", SRMAnalyzer)
+        _srm_r = _srm.compute_anomaly_score(img)
+        _jpg_r = _srm.detect_jpeg_grid_inconsistency(img)
+        signals["srm"] = round(0.70 * _srm_r["score"] + 0.30 * _jpg_r["score"], 4)
     except (ImportError, RuntimeError, OSError, ValueError) as e:
         skipped.append(f"srm ({type(e).__name__}: {e})")
 
@@ -330,18 +340,24 @@ def run_custom_pipeline(
     # ── Manual ROI crop (applied first, before any signal including YOLO) ────
     _manual_roi_applied = False
     if manual_roi:
-        _x, _y = manual_roi["x"], manual_roi["y"]
-        _w, _h = manual_roi["width"], manual_roi["height"]
-        img     = img.crop((_x, _y, _x + _w, _y + _h))
-        img_arr = np.array(img)
-        _manual_roi_applied = True
+        _iw, _ih = img.size
+        _x  = max(0, int(manual_roi["x"]))
+        _y  = max(0, int(manual_roi["y"]))
+        _w  = max(1, int(manual_roi["width"]))
+        _h  = max(1, int(manual_roi["height"]))
+        _x2 = min(_iw, _x + _w)
+        _y2 = min(_ih, _y + _h)
+        if _x2 > _x and _y2 > _y:          # H-6: skip degenerate ROI
+            img     = img.crop((_x, _y, _x2, _y2))
+            img_arr = np.array(img)
+            _manual_roi_applied = True
 
     # ── YOLO runs first so its ROI can crop subsequent signals ───────────────
     # Score intentionally NOT added to signals{} — YOLO is ROI-only, not fraud scored.
     if "yolo_damage" in selected:
         try:
             from .detectors.yolo_damage import DamageDetector
-            _detector   = DamageDetector()
+            _detector   = _cached("yolo_damage", DamageDetector)   # C-1: was bare DamageDetector()
             _detections = _detector.detect(img)
             iw, ih      = img.size
             _comp = _detector.composite_roi(img)
@@ -376,15 +392,18 @@ def run_custom_pipeline(
     if "dual_branch" in selected:
         try:
             from .detectors.dual_branch import DualBranchDetector
-            signals["dual_branch"] = DualBranchDetector().predict(img)["score"]
+            _db_r = _cached("dual_branch", DualBranchDetector).predict(img)  # C-1
+            signals["dual_branch"] = _db_r["score"]
+            details["dual_branch"] = _db_r
         except (ImportError, RuntimeError, OSError, ValueError) as e:
             skipped.append(f"dual_branch ({type(e).__name__}: {e})")
 
     if "trufor" in selected:
         try:
             from .detectors.trufor import TruForAnalyzer
-            tf_r = TruForAnalyzer().analyze(img)
+            tf_r = _cached("trufor", TruForAnalyzer).analyze(img)   # C-1
             signals["trufor"] = round(1.0 - tf_r["integrity_score"], 4)
+            details["trufor"] = tf_r
             if "noiseprint_localizer" in selected:
                 signals["noiseprint_localizer"] = round(float(tf_r.get("mask_mean", 0.0)), 4)
             if "mask_spatial_concentration" in selected:
@@ -395,7 +414,7 @@ def run_custom_pipeline(
     if "srm" in selected:
         try:
             from .detectors.srm import SRMAnalyzer
-            srm    = SRMAnalyzer()
+            srm    = _cached("srm", SRMAnalyzer)                     # C-1
             srm_r  = srm.compute_anomaly_score(img)
             jpeg_r = srm.detect_jpeg_grid_inconsistency(img)
             signals["srm"] = round(0.70 * srm_r["score"] + 0.30 * jpeg_r["score"], 4)
@@ -407,14 +426,14 @@ def run_custom_pipeline(
     if "siglip2" in selected:
         try:
             from .detectors.siglip2 import SigLIP2Detector
-            signals["siglip2"] = round(SigLIP2Detector().score(img), 4)
+            signals["siglip2"] = round(_cached("siglip2", SigLIP2Detector).score(img), 4)  # C-1
         except (ImportError, RuntimeError, OSError, ValueError) as e:
             skipped.append(f"siglip2 ({type(e).__name__}: {e})")
 
     if "clip_ufd" in selected:
         try:
             from .detectors.clip_ufd import UFDAdapter
-            signals["clip_ufd"] = UFDAdapter().predict(img)["score"]
+            signals["clip_ufd"] = _cached("clip_ufd", UFDAdapter).predict(img)["score"]    # C-1
         except (ImportError, RuntimeError, OSError, ValueError) as e:
             skipped.append(f"clip_ufd ({type(e).__name__}: {e})")
 
@@ -465,7 +484,7 @@ def run_custom_pipeline(
     if "dire" in selected:
         try:
             from .detectors.dire import DIREDetector
-            r = DIREDetector().predict(img)
+            r = _cached("dire", DIREDetector).predict(img)           # C-1
             if r["score"] is not None:
                 # DIRE: low error = AI-generated; map confidence to fake probability [0,1]
                 fake_prob = r["confidence"] if r["label"] == "Fake" else 1.0 - r["confidence"]
@@ -479,7 +498,7 @@ def run_custom_pipeline(
         try:
             import numpy as _np
             from .detectors.rigid import RIGIDDetector
-            r = RIGIDDetector().predict(img)
+            r = _cached("rigid", RIGIDDetector).predict(img)         # C-1
             if r["score"] is not None:
                 # RIGID sensitivity is high=real → convert to fake probability
                 fake_prob = float(1.0 / (1.0 + _np.exp((r["score"] - r["threshold"]) * 50)))
@@ -490,7 +509,7 @@ def run_custom_pipeline(
     if "textshield" in selected:
         try:
             from .detectors.textshield import TextShieldDetector
-            r = TextShieldDetector().predict(img)
+            r = _cached("textshield", TextShieldDetector).predict(img)  # C-1
             if r["score"] is not None:
                 signals["textshield"] = round(float(r["score"]), 4)
         except (ImportError, RuntimeError, OSError, ValueError) as e:

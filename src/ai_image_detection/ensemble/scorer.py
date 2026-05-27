@@ -30,9 +30,12 @@ Sources: UAIC uaic-fraud-detection/poc/ensemble_scorer.py
 
 from __future__ import annotations
 
+import logging
 import math
 from pathlib import Path
 from typing import Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 from ..config import (
     DOCUMENT_FRAUD_WEIGHTS,
@@ -237,21 +240,23 @@ class EnsembleScorer:
 
     def _score_trained(self, signals: Dict[str, float]) -> dict:
         if not _TRAINED_MODEL_PATH.exists():
+            reason = f"Trained model not found at {_TRAINED_MODEL_PATH}."
+            logger.warning("EnsembleScorer: falling back to fixed weights — %s", reason)
             result = self._score_fixed(signals)
             result["mode"]             = "fixed_fallback"
-            result["_fallback_reason"] = f"Trained model not found at {_TRAINED_MODEL_PATH}."
+            result["_fallback_reason"] = reason
             return result
         try:
             import numpy as np
             clf = _load_clf_safely()
 
-            feat = [
-                signals.get("dual_branch", 0.5),
-                signals.get("clip_ufd",    0.5),
-                signals.get("trufor",      0.5),
-                signals.get("srm",         0.5),
-                signals.get("metadata",    0.5),
-            ]
+            # H-5: filter None values — use only signals that actually ran.
+            # signals.get(key, 0.5) would silently impute 0.5 for None, corrupting
+            # the feature vector. Only include keys with a real float value.
+            _FEAT_KEYS = ("dual_branch", "clip_ufd", "trufor", "srm", "metadata")
+            clean = {k: float(v) for k, v in signals.items() if k in _FEAT_KEYS and v is not None}
+            feat  = [clean.get(k, 0.5) for k in _FEAT_KEYS]
+
             prob   = clf.predict_proba([feat])[0][1]
             result = self._score_fixed(signals)
             result["ensemble_score"] = round(float(prob), 4)
@@ -259,9 +264,11 @@ class EnsembleScorer:
             result["mode"]           = "trained"
             return result
         except Exception as e:
+            reason = f"Trained model load error: {e}"
+            logger.warning("EnsembleScorer: falling back to fixed weights — %s", reason)
             result = self._score_fixed(signals)
             result["mode"]             = "fixed_fallback"
-            result["_fallback_reason"] = f"Trained model load error: {e}"
+            result["_fallback_reason"] = reason
             return result
 
     # ── Helpers ───────────────────────────────────────────────────────────────

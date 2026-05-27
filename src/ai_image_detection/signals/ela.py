@@ -38,10 +38,14 @@ def ela_anomaly_score(img_pil: Image.Image) -> dict:
         QUALITY = 85
         rgb     = img_pil.convert("RGB")
 
+        # M-4: use context manager so BytesIO and the re-opened Image are always
+        # closed promptly — not left open until GC (important in server/API mode).
         buf = io.BytesIO()
         rgb.save(buf, format="JPEG", quality=QUALITY)
         buf.seek(0)
-        recompressed = Image.open(buf).convert("RGB")
+        with Image.open(buf) as _recomp_raw:
+            recompressed = _recomp_raw.convert("RGB")
+        buf.close()
 
         orig_arr   = np.array(rgb,          dtype=np.float32)
         recomp_arr = np.array(recompressed, dtype=np.float32)
