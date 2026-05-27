@@ -10,6 +10,18 @@ torchvision>=0.15.0
 transformers>=4.35.0
 timm>=0.9.0
 
+# Diffusion-based detectors (DIRE uses StableDiffusionXL / Flux inversion)
+diffusers>=0.21.0
+
+# YOLO damage detector (vehicle pipeline)
+ultralytics>=8.0.0
+
+# Safe model loading (ensemble meta-classifier — joblib replaces pickle)
+joblib>=1.2.0
+
+# Web UI
+streamlit>=1.28.0
+
 # Image forensics
 scipy>=1.10.0
 opencv-python>=4.8.0
